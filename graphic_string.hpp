@@ -8,6 +8,8 @@
 #ifndef GRAPHIC_STRING_HPP_
 #define GRAPHIC_STRING_HPP_
 
+#include <vector>
+
 #include "SDL/SDL.h"
 
 #include "vect.hpp"

@@ -15,6 +15,7 @@
 
 #include "vect.hpp"
 #include "framer.hpp"
+#include "graphic_string.hpp"
 
 #ifndef SDL_CLASS_H_
 #define SDL_CLASS_H_
