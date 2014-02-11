@@ -34,7 +34,7 @@ struct FONT
 class FONT_POCKET
 {
 	vector<FONT>fonts;
-	FONT default_font;
+	FONT* default_font;
 public:
 	TTF_Font* new_font(const char* U_font_loc,unsigned int U_font_size)
 	{
@@ -51,6 +51,8 @@ public:
 		TTF_Font* font=TTF_OpenFont(U_font_loc,U_font_size);
 		if(font)
 		{
+			if(!default_font)
+				default_font=new FONT(U_font_loc,U_font_size,font);
 			fonts.push_back(FONT(U_font_loc,U_font_size,font));
 			ofstream fout("logs/allocation log.txt",ios::app);
 			fout<<"Font "<<U_font_loc<<" "<<U_font_size<<" ("<<fonts[fonts.size()-1].font<<") loaded into slot "<<(fonts.size()-1)<<'\n';
@@ -61,10 +63,14 @@ public:
 	}
 	TTF_Font* new_font()
 	{
-		return default_font.font;
+		if(default_font)
+			return default_font->font;
+		else
+			return NULL;
 	}
-	FONT_POCKET(FONT U_default_font):default_font(U_default_font)
+	FONT_POCKET()
 	{
+		default_font=NULL;
 	}
 	~FONT_POCKET()
 	{
@@ -222,6 +228,11 @@ public:
 	{
 		return !(all.compare(text)==0);
 	}
+	void set_parent_screen(SDL_Surface* new_screen)
+	{
+		if(new_screen)
+			scr=new_screen;
+	}
 	void set_font(TTF_Font * Font)
 	{
 		ofstream fout("logs/log.txt",ios::app);
@@ -241,7 +252,7 @@ public:
 	{
 		set_position(pos.x,pos.y);
 	}
-	void set_color(short unsigned int r,short unsigned int g,short unsigned int b)
+	void set_color(short unsigned int r=0,short unsigned int g=0,short unsigned int b=0)
 	{
 		col=(SDL_Color){r,g,b};
 	}
