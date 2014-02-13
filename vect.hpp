@@ -71,6 +71,15 @@ public:
 		temp.z=z+b.z;
 		return temp;
 	}
+	template<class B>
+	vect<T> operator+(vect<B> b)
+	{
+		vect<T> temp;
+		temp.x=x+b.x;
+		temp.y=y+b.y;
+		temp.z=z+b.z;
+		return temp;
+	}
 	vect operator-(vect b)
 	{
 		vect temp;
