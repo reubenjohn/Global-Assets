@@ -47,6 +47,14 @@ public:
 		z=b.z;
 		return *this;
 	}
+	template<class B>
+	vect operator=(vect<B> b)
+	{
+		x=b.x;
+		y=b.y;
+		z=b.z;
+		return *this;
+	}
 	bool operator==(vect b)
 	{
 		return (x==b.x&&y==b.y&&z==b.z);

@@ -13,6 +13,7 @@
 #include "SDL/SDL_image.h"
 #include "SDL/SDL_ttf.h"
 #include "SDL/SDL_mixer.h"
+#include "SDL/SDL_gfx/include/SDL_gfxPrimitives.h"
 
 #include "vect.hpp"
 #include "framer.hpp"
@@ -180,8 +181,56 @@ SDL_Surface* copy_surface(SDL_Surface* source)
 	return SDL_ConvertSurface(source, source->format, source->flags);
 }
 
+struct PIXEL_DATA
+{
+	int x,y;
+	SDL_Color color;
+};
+struct LINE_DATA
+{
+public:
+	struct
+	{
+		int x,y;
+	}from;
+	struct
+	{
+		int x,y;
+	}to;
+	SDL_Color color;
+};
 class SDL_2D
 {
+	vector<PIXEL_DATA> pixel_draw_stack;
+	vector<LINE_DATA> line_draw_stack;
+	/**
+	 * changes the color of the pixel at (x,y) of the SDL_Surface that is passed using the color that is passed
+	 */
+	void put_pixel(int x, int y, SDL_Color color)
+	{
+		//Convert the pixels to 32 bit
+		Uint32 *pixels = (Uint32 *)scr->pixels;
+		Uint32 pixel=SDL_MapRGB(scr->format,255, 0, 0);
+		//Set the pixel
+		pixels[ ( y * scr->w ) + x ] = pixel;
+	}
+	void put_pixel(PIXEL_DATA pixel_data)
+	{
+		//Convert the pixels to 32 bit
+		Uint32 *pixels = (Uint32 *)scr->pixels;
+		Uint32 pixel=SDL_MapRGB(scr->format,255,0,0);
+		//Set the pixel
+		pixels[ ( pixel_data.y * scr->w ) + pixel_data.x ] = pixel;
+	}
+	/**
+	* draws a line to the SDL_Surface that is passed from coordinates (x1,y1) to (x2,y2)
+	* using the color that is passed int the SDL_Color variable
+	* (by simply calls the put_pixel() many times)
+	*/
+	void draw_line(int x1, int y1, int x2, int y2, const SDL_Color& color)
+	{
+		lineRGBA(scr,x1,y1,x2,y2,color.r,color.g,color.b,color.unused);
+	}
 public:
 	SDL_2D &SDL_2D_obj;
    SDL_Surface* scr;
@@ -294,75 +343,98 @@ public:
 	   }
 	   return false;
    }
-   /**
-	* changes the color of the pixel at (x,y) of the SDL_Surface that is passed using the color that is passed
-	*/
-   void put_pixel(int x, int y, SDL_Color color)
+   bool on_screen(int x, int y)
    {
-	   //Convert the pixels to 32 bit
-	   Uint32 *pixels = (Uint32 *)scr->pixels;
-	   Uint32 pixel=SDL_MapRGB(scr->format,255, 0, 0);
-	   //Set the pixel
-	   pixels[ ( y * scr->w ) + x ] = pixel;
+	   if(x>scr_origin.x
+		&&y>scr_origin.y
+		&&x<scr_origin.x+scr_dim.x
+		&&x<scr_origin.y+scr_dim.y
+		)
+		   return true;
+	   else
+		   return false;
+   }
+   void stack_pixel(PIXEL_DATA pixel_data)
+   {
+	   pixel_draw_stack.push_back(pixel_data);
+   }
+   void stack_pixel(int x, int y, SDL_Color color)
+   {
+	   PIXEL_DATA temp;
+	   temp.x=x;
+	   temp.y=y;
+	   temp.color=color;
+	   stack_pixel(temp);
+   }
+   void stack_pixel(vect<int> position, SDL_Color color)
+   {
+	   PIXEL_DATA temp;
+	   temp.x=position.x;
+	   temp.y=position.y;
+	   temp.color=color;
+	   stack_pixel(temp);
+   }
+   void draw_pixels()
+   {
+	   for(unsigned int i=0;i<pixel_draw_stack.size();i++)
+	   {
+		   put_pixel(pixel_draw_stack[i]);
+	   }
+   }
+   void draw_line(LINE_DATA line_data)
+   {
+	   draw_line(line_data.from.x,line_data.from.y,line_data.to.x,line_data.to.y,line_data.color);
+   }
+   void stack_line(int x1, int y1, int x2, int y2, const SDL_Color& color)
+   {
+	   LINE_DATA temp;
+	   temp.from.x=x1;temp.from.y=y1;
+	   temp.to.x=x2;temp.to.y=y2;
+	   temp.color=color;
+	   stack_line(temp);
+   }
+   void stack_line(LINE_DATA line_data)
+   {
+	   line_draw_stack.push_back(line_data);
+   }
+   void draw_lines()
+   {
+	   if(!line_draw_stack.empty())
+	   {
+		   if( SDL_MUSTLOCK( scr ) )
+		   {
+			   //Lock the surface
+			   SDL_LockSurface( scr );
+		   }
+		   for(unsigned int i=0;i<line_draw_stack.size();i++)
+		   {
+			   draw_line(line_draw_stack[i]);
+		   }
+		   line_draw_stack.clear();
+		   if( SDL_MUSTLOCK( scr ) )
+		   {
+			   SDL_UnlockSurface( scr );
+		   }
+	   }
+  }
+  int pixel_draw_jobs()
+  {
+   return pixel_draw_stack.size();
+  }
+  int line_draw_jobs()
+  {
+	  return line_draw_stack.size();
+  }
+  int geometry_draw_jobs()
+  {
+	  return pixel_draw_jobs()+line_draw_jobs();
+  }
+   void draw_geometry()
+   {
+	   draw_pixels();
+	   draw_lines();
    }
    /**
-	* draws a line to the SDL_Surface that is passed from coordinates (x1,y1) to (x2,y2)
-	* using the color that is passed int the SDL_Color variable
-	* (by simply calls the put_pixel() many times)
-	*/
-   void draw_line(float x1, float y1, float x2, float y2, const SDL_Color& color )
-       {
-       	if( SDL_MUSTLOCK( scr ) )
-       	{
-       		//Lock the surface
-       		SDL_LockSurface( scr );
-       	}
-	   // Bresenham's line algorithm
-	   const bool steep = (fabs(y2 - y1) > fabs(x2 - x1));
-	   if(steep)
-	   {
-		   std::swap(x1, y1);
-		   std::swap(x2, y2);
-	   }
-
-	   if(x1 > x2)
-	   {
-		   std::swap(x1, x2);
-		   std::swap(y1, y2);
-	   }
-
-	   const float dx = x2 - x1;
-	   const float dy = fabs(y2 - y1);
-
-	   float error = dx / 2.0f;
-	   const int ystep = (y1 < y2) ? 1 : -1;
-	   int y = (int)y1;
-
-	   const int maxX = (int)x2;
-	   for(int x=(int)x1; x<maxX; x++)
-	   {
-		   if(steep)
-		   {
-			put_pixel(y,x, color);
-		   }
-		   else
-		   {
-			put_pixel(x,y, color);
-		   }
-
-		   error -= dy;
-		   if(error < 0)
-		   {
-			   y += ystep;
-			   error += dx;
-		   }
-	   }
-	   if( SDL_MUSTLOCK( scr ) )
-	   {
-		   SDL_UnlockSurface( scr );
-	   }
-   }
-	/**
 	 * used to apply an SDL_Surface onto the scr(SDL_Surface variable that represents the screen)
 	 * at the coordinates given by pos
 	 */
@@ -395,7 +467,7 @@ public:
 	 * after being rotated by a user_angle
 	 * and scaled up by a factor of 'zoom'
 	 */
-	void applysurface(SDL_Surface* image,vect<> pos,vect<> user_angle,double zoom)
+	void applysurface(SDL_Surface* image,vect<int> pos,vect<> user_angle,double zoom)
 	{
 		if(scr==NULL)
 			debugger.found("applysurface()","::scr is pointing to NULL");
@@ -447,10 +519,12 @@ public:
 	 * and returns a vector representing the apparent 2D coordinates (on the screen)
 	 * where the user should observe it
 	 */
-	vect<> apparent_pos_of(vect<> pos)
+	vect<int> apparent_pos_of(vect<> pos)
 	{
 		vect<> relPos=(pos-camera_pos);
-		return scr_dim/2+(scr_dim/2)*relPos/(relPos.z*tan(AngleOfView()));
+		vect<> apparent_pos=scr_dim/2+(scr_dim/2)*relPos/(relPos.z*tan(AngleOfView()));
+		vect<int> apparent_pos_int;
+		return apparent_pos_int=apparent_pos;
 	}
 	/*similar but inverse of apparent_pos_of
 	i.e. this one accepts an apparent position and
@@ -467,16 +541,16 @@ public:
 	/**
 	 * Similar to the Drawline() exept it accepts vect<> variables as coordinates instead of (float,float)
 	 */
-	void draw_vect_line(vect<> a,vect<> b,SDL_Color color)
+	void queue_vect_line(vect<> a,vect<> b,SDL_Color color)
 	{
-		vect<> appPos_a=apparent_pos_of(a),appPos_b=apparent_pos_of(b);
+		vect<int> appPos_a=apparent_pos_of(a),appPos_b=apparent_pos_of(b);
 		if(
 			appPos_a.x>scr->clip_rect.x+50
 			&&appPos_b.x<scr->clip_rect.x+scr->clip_rect.w-50
 			&&appPos_a.y>scr->clip_rect.y+50
 			&&appPos_b.y<scr->clip_rect.y+scr->clip_rect.h-50
 			)
-			draw_line(appPos_a.x,appPos_a.y,appPos_b.x,appPos_b.y,color);
+			stack_line(appPos_a.x,appPos_a.y,appPos_b.x,appPos_b.y,color);
 	}
 };
 
