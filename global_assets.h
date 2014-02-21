@@ -13,11 +13,13 @@
 #include "SDL/SDL_image.h"
 #include "SDL/SDL_ttf.h"
 #include "SDL/SDL_mixer.h"
-#include "SDL/SDL_gfx/include/SDL_gfxPrimitives.h"
+#include "SDL_gfx/SDL_gfxPrimitives.h"
+#include "SDL_gfx/SDL_gfxBlitFunc.h"
 
 #include "vect.hpp"
 #include "framer.hpp"
 #include "graphic_string.hpp"
+#include "global_assets/random.hpp"
 
 #ifndef SDL_CLASS_H_
 #define SDL_CLASS_H_
@@ -157,20 +159,10 @@ const char* decimal_format_string(double d,const char* format="%8.2f")
 SDL_Surface* loadimage(string filename)
 {
 	SDL_Surface* tex=IMG_Load(filename.c_str());
-	if(tex!=NULL)
+	if(tex)
 	{
-		tex=SDL_DisplayFormat(tex);
-		if(tex!=NULL)
-		{
-			SDL_SetColorKey(tex,SDL_SRCCOLORKEY,SDL_MapRGB(tex->format,0,0xFF,0xFF));
-			if(tex==NULL)
-				debugger.found("loadimage()","SDL_SetColorKey() failed");
-		}
-		else
-			debugger.found("loadimage()","SDL_DisplayFormat() failed");
+		SDL_SetColorKey(tex,SDL_SRCCOLORKEY,SDL_MapRGB(tex->format,0,0xFF,0xFF));
 	}
-		else
-			debugger.found("loadimage()","IMG_Load() failed");
 	return tex;
 }
 /**
@@ -477,6 +469,22 @@ public:
 			SDL_Rect temp={pos.x-image->w/2.0,pos.y-image->h/2.0};
 			if(image==NULL)
 					debugger.found("applysurface()","rotozoom() causes image to point to NULL");
+			SDL_BlitSurface(image,NULL,scr,&temp);
+			SDL_FreeSurface(image);//frees newly created rotated image (retaining the original surface passed to applysurface!)
+		}
+	}
+	void applysurface(SDL_Surface* image,vect<int> pos,vect<> user_angle,double zoom,double opacity)
+	{
+		if(scr==NULL)
+			debugger.found("applysurface()","::scr is pointing to NULL");
+		else
+		{
+			image=rotozoomSurface(image,user_angle.z,zoom,0);
+			image=SDL_DisplayFormatAlpha(image);
+			SDL_Rect temp={pos.x-image->w/2.0,pos.y-image->h/2.0};
+			if(image==NULL)
+					debugger.found("applysurface()","rotozoom() causes image to point to NULL");
+			SDL_gfxSetAlpha(image,opacity);
 			SDL_BlitSurface(image,NULL,scr,&temp);
 			SDL_FreeSurface(image);//frees newly created rotated image (retaining the original surface passed to applysurface!)
 		}
