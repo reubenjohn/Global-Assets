@@ -18,6 +18,18 @@ int random(int a,int b)	//returns a pseudo random integer between a and b
 	int d=b-a;
 	return a+rand()%d;
 }
+
+double random(double a,double b)	//returns a pseudo random long double between a and b
+{
+	double d=b-a;
+	if(d<0)
+		d=-d;
+
+	if(log(d)>7)
+		return a+(double)(rand()%(int)(d/pow(10,log(d)-7)))*pow(10,log(d)-7);
+//(else
+		return a+(double)(rand()%(int)(d*pow(10,7-log(d))))/pow(10,7-log(d));
+}
 long double random(long double a,long double b)	//returns a pseudo random long double between a and b
 {
 	long double d=b-a;
@@ -29,6 +41,7 @@ long double random(long double a,long double b)	//returns a pseudo random long d
 //(else
 		return a+(long double)(rand()%(int)(d*pow(10,7-log(d))))/pow(10,7-log(d));
 }
+
 template<class T>
 vect<T> random(vect<T> a,vect<T> b)	//returns a pseudo random vect between a and b
 {
